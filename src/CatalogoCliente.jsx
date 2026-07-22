@@ -61,7 +61,7 @@ export default function CatalogoCliente({ onSwitchToAdmin, adminMode = false, on
   const [stockDraft, setStockDraft] = useState('');
   const [savingStock, setSavingStock] = useState(false);
 
-  const WHATSAPP_NUMBER = "+56992379465";
+  const WHATSAPP_NUMBER = "+56992364798";
 
   // Cargar categorías dinámicamente desde los productos
   const [categories, setCategories] = useState(["Todas"]);
