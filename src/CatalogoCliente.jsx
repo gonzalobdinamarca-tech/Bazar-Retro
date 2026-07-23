@@ -2011,7 +2011,7 @@ export default function CatalogoCliente({ onSwitchToAdmin, adminMode = false, on
               }}
             >
               <span style={{ fontSize: '24px' }}>📱</span>
-              <span>WhatsApp: +56 9 9237 9465</span>
+              <span>WhatsApp: +56 9 9236 4798</span>
             </a>
           </div>
 
