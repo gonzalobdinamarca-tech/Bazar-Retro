@@ -759,10 +759,10 @@ export default function CatalogoCliente({ onSwitchToAdmin, adminMode = false, on
             width: 100%;
           }
 
-          /* Forzar layout horizontal en items del carrito */
+          /* Layout de items del carrito en móvil: permite que la fila
+             se acomode en dos líneas para que el nombre nunca se comprima */
           .cart-content > div > div {
-            flex-direction: row !important;
-            flex-wrap: nowrap !important;
+            flex-wrap: wrap !important;
           }
 
           .cart-content h3,
@@ -770,6 +770,8 @@ export default function CatalogoCliente({ onSwitchToAdmin, adminMode = false, on
           .cart-content span {
             writing-mode: horizontal-tb !important;
             white-space: normal !important;
+            word-break: normal !important;
+            overflow-wrap: anywhere;
           }
 
           .product-card-image {
