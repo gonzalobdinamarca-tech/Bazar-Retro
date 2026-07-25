@@ -2011,7 +2011,7 @@ export default function CatalogoCliente({ onSwitchToAdmin, adminMode = false, on
               }}
             >
               <span style={{ fontSize: '24px' }}>📱</span>
-              <span>WhatsApp: +56 9 9236 4798</span>
+              <span>WhatsApp: +56 9 9237 9465</span>
             </a>
           </div>
 
@@ -2096,6 +2096,7 @@ export default function CatalogoCliente({ onSwitchToAdmin, adminMode = false, on
                     <div key={item.id} style={{
                       display: 'flex',
                       flexDirection: 'row',
+                      flexWrap: 'wrap',
                       alignItems: 'center',
                       gap: '16px',
                       background: '#f9fafb',
@@ -2119,7 +2120,7 @@ export default function CatalogoCliente({ onSwitchToAdmin, adminMode = false, on
                         }}
                       />
                       <div style={{ 
-                        flex: 1, 
+                        flex: '1 1 150px', 
                         minWidth: 0,
                         display: 'flex',
                         flexDirection: 'column',
