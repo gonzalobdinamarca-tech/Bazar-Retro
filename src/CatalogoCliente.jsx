@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabaseClient";
 
 /**
@@ -26,6 +26,69 @@ import { supabase } from "./supabaseClient";
  * - Siguientes cargas: ~0-5 MB (caché)
  * - Consumo mensual: 2-4 GB (dentro del límite de 5 GB)
  */
+
+// ============================================================================
+// AJUSTE DE IMAGENES DEL CATALOGO
+// ----------------------------------------------------------------------------
+// Las fotos tienen proporciones distintas entre si, y el recuadro de la tarjeta
+// es horizontal. Cuando la foto no calza, queda espacio vacio a los lados.
+// Aqui se define con que se rellena ese espacio.
+//
+// Para cambiarlo, edita SOLO la linea de RELLENO_TARJETA con una de estas:
+//
+//   'predominante'  Rellena con el color dominante de cada foto.
+//                   En fotos con fondo blanco rellena blanco (no se nota),
+//                   en fotos ambientadas usa un tono que combina.
+//
+//   'blanco'        Rellena siempre con blanco.
+//
+//   'ninguno'       Vuelve al comportamiento anterior (franjas del fondo gris).
+//
+// Cambiar esto NO modifica las fotos originales ni la base de datos.
+// ============================================================================
+const RELLENO_TARJETA = 'predominante';
+
+const RELLENOS = {
+  predominante: 'c_pad,b_auto:predominant',
+  blanco: 'c_pad,b_white',
+  ninguno: null
+};
+
+// Inserta transformaciones en una URL de Cloudinary.
+// Si la URL no es de Cloudinary, la devuelve intacta.
+function transformarCloudinary(url, partes) {
+  if (!url || typeof url !== 'string') return url;
+  if (url.indexOf('/upload/') === -1) return url;
+  const t = partes.filter(Boolean).join(',');
+  if (!t) return url;
+  return url.replace('/upload/', '/upload/' + t + '/');
+}
+
+// Foto de la tarjeta del catalogo: ajustada al recuadro + optimizada.
+function imgTarjeta(url) {
+  const relleno = RELLENOS[RELLENO_TARJETA];
+  if (!relleno) {
+    return transformarCloudinary(url, ['w_648', 'f_auto', 'q_auto']);
+  }
+  return transformarCloudinary(url, [relleno, 'w_648', 'h_440', 'f_auto', 'q_auto']);
+}
+
+// Foto del modal de detalle: sin relleno (se ve completa), solo optimizada.
+function imgDetalle(url) {
+  return transformarCloudinary(url, ['w_1000', 'f_auto', 'q_auto']);
+}
+
+// Foto del lightbox: mayor resolucion porque se puede hacer zoom.
+function imgLightbox(url) {
+  return transformarCloudinary(url, ['w_1600', 'f_auto', 'q_auto:good']);
+}
+
+// Si una version transformada fallara, vuelve a la foto original.
+function fallbackImagenOriginal(e, urlOriginal) {
+  if (e.currentTarget.src !== urlOriginal) {
+    e.currentTarget.src = urlOriginal;
+  }
+}
 
 export default function CatalogoCliente({ onSwitchToAdmin, adminMode = false, onEditProduct, onDeleteProduct }) {
   const [products, setProducts] = useState([]);
@@ -103,7 +166,7 @@ export default function CatalogoCliente({ onSwitchToAdmin, adminMode = false, on
       selectedProduct.images.forEach((url) => {
         if (url) {
           const preload = new Image();
-          preload.src = url;
+          preload.src = imgDetalle(url);
         }
       });
     }
@@ -374,6 +437,41 @@ export default function CatalogoCliente({ onSwitchToAdmin, adminMode = false, on
 
   const goToImage = (index) => {
     setCurrentImageIndex(index);
+  };
+
+  // ---- Deslizar (swipe) para cambiar de foto en celular ----
+  const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
+  const justSwiped = useRef(false);
+
+  const handleImageTouchStart = (e) => {
+    const t = e.touches[0];
+    touchStartX.current = t.clientX;
+    touchStartY.current = t.clientY;
+  };
+
+  const handleImageTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStartX.current;
+    const dy = t.clientY - touchStartY.current;
+    touchStartX.current = null;
+    touchStartY.current = null;
+
+    const hasMultiple =
+      selectedProduct && selectedProduct.images && selectedProduct.images.length > 1;
+
+    // Solo si es un gesto claramente horizontal, largo, y sin zoom activo
+    if (hasMultiple && !isZoomed && Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+      justSwiped.current = true;
+      if (dx < 0) {
+        nextImage();
+      } else {
+        prevImage();
+      }
+      // Evita que el mismo gesto dispare el clic (abrir lightbox / zoom)
+      setTimeout(() => { justSwiped.current = false; }, 400);
+    }
   };
 
   // Generar números de página con ellipsis inteligente
@@ -1434,9 +1532,10 @@ export default function CatalogoCliente({ onSwitchToAdmin, adminMode = false, on
                 >
                   {product.images && product.images.length > 0 ? (
                     <img
-                      src={product.images[0]}
+                      src={imgTarjeta(product.images[0])}
                       alt={product.name}
                       loading="lazy"
+                      onError={(e) => fallbackImagenOriginal(e, product.images[0])}
                       style={{ 
                         width: '100%', 
                         height: '100%', 
@@ -2365,7 +2464,11 @@ export default function CatalogoCliente({ onSwitchToAdmin, adminMode = false, on
             {selectedProduct.images && selectedProduct.images.length > 0 && (
               <div style={{ position: 'relative', marginBottom: '20px' }}>
                 {/* Imagen con encuadre correcto */}
-                <div className="detail-image-box" style={{
+                <div className="detail-image-box"
+                  onTouchStart={handleImageTouchStart}
+                  onTouchEnd={handleImageTouchEnd}
+                  style={{
+                  touchAction: 'pan-y',
                   width: '100%',
                   background: '#f9fafb',
                   borderRadius: '16px',
@@ -2377,9 +2480,10 @@ export default function CatalogoCliente({ onSwitchToAdmin, adminMode = false, on
                   justifyContent: 'center'
                 }}>
                   <img
-                    src={selectedProduct.images[currentImageIndex]}
+                    src={imgDetalle(selectedProduct.images[currentImageIndex])}
                     alt={`${selectedProduct.name} - Imagen ${currentImageIndex + 1}`}
-                    onClick={() => setShowLightbox(true)}
+                    onError={(e) => fallbackImagenOriginal(e, selectedProduct.images[currentImageIndex])}
+                    onClick={() => { if (justSwiped.current) { justSwiped.current = false; return; } setShowLightbox(true); }}
                     style={{
                       width: '100%',
                       height: '100%',
@@ -2878,12 +2982,17 @@ export default function CatalogoCliente({ onSwitchToAdmin, adminMode = false, on
           <div
             className="lightbox-img-wrap"
             onClick={(e) => e.stopPropagation()}
+            onTouchStart={handleImageTouchStart}
+            onTouchEnd={handleImageTouchEnd}
+            style={{ touchAction: 'pan-y' }}
           >
             <img
-              src={selectedProduct.images[currentImageIndex]}
+              src={imgLightbox(selectedProduct.images[currentImageIndex])}
               alt={`${selectedProduct.name} - Imagen ${currentImageIndex + 1}`}
+              onError={(e) => fallbackImagenOriginal(e, selectedProduct.images[currentImageIndex])}
               onClick={(e) => {
                 e.stopPropagation();
+                if (justSwiped.current) { justSwiped.current = false; return; }
                 setIsZoomed(!isZoomed);
               }}
               style={{
